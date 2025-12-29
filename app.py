@@ -222,8 +222,8 @@ elif page == "💵 Income & Expenses":
         
         if st.session_state.get("new_fixed_expense", False):
             with st.form("add_fixed_expense", clear_on_submit=True):
-                name = st.text_input("Expense Name")
-                amount = st.number_input("Amount", min_value=0.0, step=10.0)
+                name = st.text_input("Expense Name", key="new_fixed_expense_name")
+                amount = st.number_input("Amount", min_value=0.0, step=10.0, key="new_fixed_expense_amount")
                 col1, col2 = st.columns(2)
                 with col1:
                     submitted = st.form_submit_button("✅ Add Expense", use_container_width=True)
@@ -294,9 +294,9 @@ elif page == "💵 Income & Expenses":
         
         if st.session_state.get("new_variable_expense", False):
             with st.form("add_variable_expense", clear_on_submit=True):
-                name = st.text_input("Expense Name")
-                amount = st.number_input("Amount", min_value=0.0, step=10.0)
-                date = st.date_input("Date", value=datetime.now())
+                name = st.text_input("Expense Name", key="new_variable_expense_name")
+                amount = st.number_input("Amount", min_value=0.0, step=10.0, key="new_variable_expense_amount")
+                date = st.date_input("Date", value=datetime.now(), key="new_variable_expense_date")
                 col1, col2 = st.columns(2)
                 with col1:
                     submitted = st.form_submit_button("✅ Add Expense", use_container_width=True)
@@ -433,8 +433,8 @@ elif page == "💰 Savings & Investments":
         # Form to add new account
         if st.session_state.get("new_savings_account", False):
             with st.form("add_savings_account"):
-                account_name = st.text_input("Account Name (e.g., Bank Name)", placeholder="e.g., Banco Santander")
-                initial_balance = st.number_input("Initial Balance", min_value=0.0, value=0.0, step=100.0)
+                account_name = st.text_input("Account Name (e.g., Bank Name)", placeholder="e.g., Banco Santander", key="new_savings_account_name")
+                initial_balance = st.number_input("Initial Balance", min_value=0.0, value=0.0, step=100.0, key="new_savings_account_balance")
                 submitted = st.form_submit_button("Add Account")
                 if submitted and account_name:
                     savings_accounts.append({
@@ -509,12 +509,12 @@ elif page == "💰 Savings & Investments":
             with st.form("add_savings_recurring", clear_on_submit=True):
                 if savings_accounts:
                     account_names = [acc.get('name', 'Unnamed') for acc in savings_accounts]
-                    selected_account = st.selectbox("Select Account", account_names)
+                    selected_account = st.selectbox("Select Account", account_names, key="new_savings_recurring_account")
                 else:
                     selected_account = None
                     st.info("Add a savings account first to track contributions")
                 
-                amount = st.number_input("Monthly Contribution Amount", min_value=0.0, step=50.0)
+                amount = st.number_input("Monthly Contribution Amount", min_value=0.0, step=50.0, key="new_savings_recurring_amount")
                 col1, col2 = st.columns(2)
                 with col1:
                     submitted = st.form_submit_button("✅ Add Recurring", use_container_width=True)
@@ -593,13 +593,13 @@ elif page == "💰 Savings & Investments":
             with st.form("add_savings_contribution", clear_on_submit=True):
                 if savings_accounts:
                     account_names = [acc.get('name', 'Unnamed') for acc in savings_accounts]
-                    selected_account = st.selectbox("Select Account", account_names)
+                    selected_account = st.selectbox("Select Account", account_names, key="new_savings_contribution_account")
                 else:
                     selected_account = None
                     st.info("Add a savings account first to track contributions")
                 
-                amount = st.number_input("Contribution Amount", min_value=0.0, step=50.0)
-                date = st.date_input("Date", value=datetime.now())
+                amount = st.number_input("Contribution Amount", min_value=0.0, step=50.0, key="new_savings_contribution_amount")
+                date = st.date_input("Date", value=datetime.now(), key="new_savings_contribution_date")
                 col1, col2 = st.columns(2)
                 with col1:
                     submitted = st.form_submit_button("✅ Add", use_container_width=True)
@@ -672,7 +672,7 @@ elif page == "💰 Savings & Investments":
         
         if st.session_state.get("new_investment_recurring", False):
             with st.form("add_investment_recurring", clear_on_submit=True):
-                amount = st.number_input("Monthly Contribution Amount", min_value=0.0, step=50.0)
+                amount = st.number_input("Monthly Contribution Amount", min_value=0.0, step=50.0, key="new_investment_recurring_amount")
                 col1, col2 = st.columns(2)
                 with col1:
                     submitted = st.form_submit_button("✅ Add Recurring", use_container_width=True)
@@ -739,8 +739,8 @@ elif page == "💰 Savings & Investments":
         
         if st.session_state.get("new_investment_contribution", False):
             with st.form("add_investment_contribution", clear_on_submit=True):
-                amount = st.number_input("Contribution Amount", min_value=0.0, step=50.0)
-                date = st.date_input("Date", value=datetime.now())
+                amount = st.number_input("Contribution Amount", min_value=0.0, step=50.0, key="new_investment_contribution_amount")
+                date = st.date_input("Date", value=datetime.now(), key="new_investment_contribution_date")
                 col1, col2 = st.columns(2)
                 with col1:
                     submitted = st.form_submit_button("✅ Add", use_container_width=True)
