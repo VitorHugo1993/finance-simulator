@@ -30,7 +30,8 @@ def load_data():
         },
         "income": {
             "user_salary": 0,
-            "partner_salary": 0
+            "partner_salary": 0,
+            "salary_months": 14
         },
         "fixed_expenses": [],
         "variable_expenses": [],
@@ -53,6 +54,12 @@ def calculate_total_expenses(data):
 def calculate_total_income(data):
     """Calculate total monthly income"""
     return data["income"]["user_salary"] + data["income"]["partner_salary"]
+
+def calculate_yearly_income(data):
+    """Calculate yearly income based on salary months (12 or 14)"""
+    monthly_income = calculate_total_income(data)
+    salary_months = data["income"].get("salary_months", 14)
+    return monthly_income * salary_months
 
 def calculate_current_net_worth(data):
     """Calculate current net worth"""
@@ -176,6 +183,19 @@ elif page == "💵 Income & Expenses":
     
     with tab1:
         st.subheader("Monthly Income")
+        
+        # Salary months selection
+        salary_months = st.radio(
+            "Salary Months per Year",
+            options=[12, 14],
+            index=0 if data["income"].get("salary_months", 14) == 12 else 1,
+            horizontal=True,
+            help="Select 12 months (standard) or 14 months (Portugal - includes holiday and Christmas bonuses)"
+        )
+        data["income"]["salary_months"] = salary_months
+        
+        st.divider()
+        
         col1, col2 = st.columns(2)
         
         with col1:
@@ -187,7 +207,13 @@ elif page == "💵 Income & Expenses":
             data["income"]["partner_salary"] = partner_salary
         
         total_income = user_salary + partner_salary
-        st.metric("Total Monthly Income", f"€{total_income:,.2f}")
+        yearly_income = calculate_yearly_income(data)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total Monthly Income", f"€{total_income:,.2f}")
+        with col2:
+            st.metric(f"Yearly Income ({salary_months} months)", f"€{yearly_income:,.2f}")
     
     with tab2:
         st.subheader("Fixed Monthly Expenses")
@@ -440,7 +466,8 @@ elif page == "⚙️ Settings":
                 },
                 "income": {
                     "user_salary": 0,
-                    "partner_salary": 0
+                    "partner_salary": 0,
+                    "salary_months": 14
                 },
                 "fixed_expenses": [],
                 "variable_expenses": [],
