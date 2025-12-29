@@ -52,11 +52,11 @@ def calculate_total_expenses(data):
     return fixed_total + variable_total
 
 def calculate_total_income(data):
-    """Calculate total monthly income"""
+    """Calculate total net monthly income"""
     return data["income"]["user_salary"] + data["income"]["partner_salary"]
 
 def calculate_yearly_income(data):
-    """Calculate yearly income based on salary months (12 or 14)"""
+    """Calculate net yearly income based on salary months (12 or 14)"""
     monthly_income = calculate_total_income(data)
     salary_months = data["income"].get("salary_months", 14)
     return monthly_income * salary_months
@@ -137,7 +137,7 @@ if page == "📊 Dashboard":
         st.metric("Total Net Worth", f"€{current_networth:,.2f}")
     
     with col2:
-        st.metric("Monthly Income", f"€{total_income:,.2f}")
+        st.metric("Net Monthly Income", f"€{total_income:,.2f}")
     
     with col3:
         st.metric("Monthly Expenses", f"€{total_expenses:,.2f}")
@@ -161,9 +161,9 @@ if page == "📊 Dashboard":
         st.bar_chart(networth_data)
     
     with col2:
-        st.subheader("Monthly Cash Flow")
+        st.subheader("Net Monthly Cash Flow")
         cashflow_data = {
-            "Income": total_income,
+            "Net Income": total_income,
             "Expenses": total_expenses,
             "Surplus": max(0, monthly_surplus)
         }
@@ -182,7 +182,7 @@ elif page == "💵 Income & Expenses":
     tab1, tab2, tab3 = st.tabs(["💰 Income", "📋 Fixed Expenses", "🛒 Variable Expenses"])
     
     with tab1:
-        st.subheader("Monthly Income")
+        st.subheader("Net Monthly Income")
         
         # Salary months selection
         salary_months = st.radio(
@@ -199,11 +199,11 @@ elif page == "💵 Income & Expenses":
         col1, col2 = st.columns(2)
         
         with col1:
-            user_salary = st.number_input("Your Monthly Salary", min_value=0.0, value=float(data["income"]["user_salary"]), step=100.0)
+            user_salary = st.number_input("Your Net Monthly Salary", min_value=0.0, value=float(data["income"]["user_salary"]), step=100.0)
             data["income"]["user_salary"] = user_salary
         
         with col2:
-            partner_salary = st.number_input("Partner's Monthly Salary", min_value=0.0, value=float(data["income"]["partner_salary"]), step=100.0)
+            partner_salary = st.number_input("Partner's Net Monthly Salary", min_value=0.0, value=float(data["income"]["partner_salary"]), step=100.0)
             data["income"]["partner_salary"] = partner_salary
         
         total_income = user_salary + partner_salary
@@ -211,9 +211,9 @@ elif page == "💵 Income & Expenses":
         
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Total Monthly Income", f"€{total_income:,.2f}")
+            st.metric("Total Net Monthly Income", f"€{total_income:,.2f}")
         with col2:
-            st.metric(f"Yearly Income ({salary_months} months)", f"€{yearly_income:,.2f}")
+            st.metric(f"Net Yearly Income ({salary_months} months)", f"€{yearly_income:,.2f}")
     
     with tab2:
         st.subheader("Fixed Monthly Expenses")
@@ -425,7 +425,7 @@ elif page == "🔮 Simulator":
                      delta=f"{(difference/simulation['current_networth']*100):.1f}%" if simulation['current_networth'] > 0 else "0%")
         
         with col2:
-            st.metric("Monthly Income", f"€{simulation['monthly_income']:,.2f}")
+            st.metric("Net Monthly Income", f"€{simulation['monthly_income']:,.2f}")
             st.metric("Monthly Expenses", f"€{simulation['monthly_expenses']:,.2f}")
             st.metric("Monthly Surplus", f"€{simulation['monthly_surplus']:,.2f}")
         
