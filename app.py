@@ -95,15 +95,19 @@ def simulate_year_end_networth(data, years=1):
     current_savings = calculate_total_savings(data)
     current_investments = data["net_worth"]["investment_account"]
     
+    # Monthly contributions are considered as consistent 12-month contributions
+    # regardless of salary months (12 or 14)
+    CONTRIBUTION_MONTHS = 12
+    
     # Simple simulation (assuming no interest/growth for now)
     # User can add investment returns later
-    projected_savings = current_savings + (monthly_savings_contribution * 12 * years)
-    projected_investments = current_investments + (monthly_investment_contribution * 12 * years)
+    projected_savings = current_savings + (monthly_savings_contribution * CONTRIBUTION_MONTHS * years)
+    projected_investments = current_investments + (monthly_investment_contribution * CONTRIBUTION_MONTHS * years)
     projected_networth = (
         current_networth +
-        (monthly_surplus * 12 * years) +
-        (monthly_savings_contribution * 12 * years) +
-        (monthly_investment_contribution * 12 * years)
+        (monthly_surplus * CONTRIBUTION_MONTHS * years) +
+        (monthly_savings_contribution * CONTRIBUTION_MONTHS * years) +
+        (monthly_investment_contribution * CONTRIBUTION_MONTHS * years)
     )
     
     return {
@@ -507,6 +511,7 @@ elif page == "💰 Savings & Investments":
         
         st.divider()
         st.subheader("Monthly Contributions")
+        st.caption("💡 Monthly contributions are considered as consistent 12-month contributions (regardless of salary months)")
         
         if st.button("➕ Add Savings Contribution"):
             if "new_savings_contribution" not in st.session_state:
@@ -574,6 +579,7 @@ elif page == "💰 Savings & Investments":
         
         st.divider()
         st.subheader("Monthly Contributions")
+        st.caption("💡 Monthly contributions are considered as consistent 12-month contributions (regardless of salary months)")
         
         if st.button("➕ Add Investment Contribution"):
             if "new_investment_contribution" not in st.session_state:
@@ -646,6 +652,7 @@ elif page == "🔮 Simulator":
     st.title("🔮 Net Worth Simulator")
     
     st.markdown("Simulate your net worth at the end of the year based on your current financial situation.")
+    st.info("ℹ️ **Note:** Monthly contributions (savings & investments) are calculated as consistent 12-month contributions, regardless of whether you receive 12 or 14 months salary.")
     
     years = st.slider("Number of Years to Simulate", min_value=1, max_value=10, value=1)
     
