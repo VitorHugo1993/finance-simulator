@@ -125,9 +125,19 @@ if page == "📊 Dashboard":
     current_networth = calculate_current_net_worth(data)
     total_income = calculate_total_income(data)
     total_expenses = calculate_total_expenses(data)
-    monthly_surplus = total_income - total_expenses
     
-    col1, col2, col3, col4 = st.columns(4)
+    # Calculate monthly savings and investment contributions
+    monthly_savings_contribution = sum(
+        contrib.get("amount", 0) for contrib in data.get("savings_recurring_monthly", [])
+    )
+    monthly_investment_contribution = sum(
+        contrib.get("amount", 0) for contrib in data.get("investment_recurring_monthly", [])
+    )
+    
+    # Monthly surplus excludes savings and investment contributions
+    monthly_surplus = total_income - total_expenses - monthly_savings_contribution - monthly_investment_contribution
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
         st.metric("Total Net Worth", f"€{current_networth:,.2f}")
@@ -139,6 +149,9 @@ if page == "📊 Dashboard":
         st.metric("Monthly Expenses", f"€{total_expenses:,.2f}")
     
     with col4:
+        st.metric("Monthly Savings", f"€{monthly_savings_contribution:,.2f}")
+    
+    with col5:
         st.metric("Monthly Surplus", f"€{monthly_surplus:,.2f}", 
                  delta=f"{monthly_surplus/total_income*100:.1f}%" if total_income > 0 else "0%")
     
@@ -162,6 +175,7 @@ if page == "📊 Dashboard":
         cashflow_data = {
             "Net Income": total_income,
             "Expenses": total_expenses,
+            "Savings": monthly_savings_contribution,
             "Surplus": max(0, monthly_surplus)
         }
         st.bar_chart(cashflow_data)
