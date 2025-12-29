@@ -62,6 +62,16 @@ def init_database():
         )
     ''')
     
+    # Yearly fixed expenses table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS yearly_fixed_expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            amount REAL NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     # Savings contributions (one-time)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS savings_contributions (
@@ -250,6 +260,7 @@ def load_data() -> Dict[str, Any]:
             "salary_months": 14
         },
         "fixed_expenses": [],
+        "yearly_fixed_expenses": [],
         "variable_expenses": [],
         "savings_contributions": [],
         "savings_recurring_monthly": [],
@@ -278,6 +289,11 @@ def load_data() -> Dict[str, Any]:
     cursor.execute("SELECT name, amount FROM fixed_expenses")
     for row in cursor.fetchall():
         data["fixed_expenses"].append({"name": row["name"], "amount": row["amount"]})
+    
+    # Load yearly fixed expenses
+    cursor.execute("SELECT name, amount FROM yearly_fixed_expenses")
+    for row in cursor.fetchall():
+        data["yearly_fixed_expenses"].append({"name": row["name"], "amount": row["amount"]})
     
     # Load variable expenses
     cursor.execute("SELECT name, amount, date FROM variable_expenses")
@@ -345,6 +361,7 @@ def save_data(data: Dict[str, Any]):
     cursor.execute("DELETE FROM net_worth")
     cursor.execute("DELETE FROM income")
     cursor.execute("DELETE FROM fixed_expenses")
+    cursor.execute("DELETE FROM yearly_fixed_expenses")
     cursor.execute("DELETE FROM variable_expenses")
     cursor.execute("DELETE FROM savings_contributions")
     cursor.execute("DELETE FROM savings_recurring_monthly")
@@ -378,6 +395,13 @@ def save_data(data: Dict[str, Any]):
     for exp in data.get("fixed_expenses", []):
         cursor.execute('''
             INSERT INTO fixed_expenses (name, amount)
+            VALUES (?, ?)
+        ''', (exp.get("name"), exp.get("amount")))
+    
+    # Save yearly fixed expenses
+    for exp in data.get("yearly_fixed_expenses", []):
+        cursor.execute('''
+            INSERT INTO yearly_fixed_expenses (name, amount)
             VALUES (?, ?)
         ''', (exp.get("name"), exp.get("amount")))
     
