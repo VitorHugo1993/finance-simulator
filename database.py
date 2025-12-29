@@ -440,3 +440,4 @@ def save_data(data: Dict[str, Any]):
     conn.commit()
     conn.close()
 
+
