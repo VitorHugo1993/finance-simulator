@@ -24,7 +24,7 @@ def load_data():
     return {
         "net_worth": {
             "current": 0,
-            "savings_account": 0,
+            "savings_accounts": [],
             "investment_account": 0,
             "other_assets": 0
         },
@@ -61,10 +61,19 @@ def calculate_yearly_income(data):
     salary_months = data["income"].get("salary_months", 14)
     return monthly_income * salary_months
 
+def calculate_total_savings(data):
+    """Calculate total savings across all accounts"""
+    savings_accounts = data["net_worth"].get("savings_accounts", [])
+    if isinstance(savings_accounts, list):
+        return sum(acc.get("balance", 0) for acc in savings_accounts)
+    # Backward compatibility: if it's still a single value
+    return data["net_worth"].get("savings_account", 0)
+
 def calculate_current_net_worth(data):
     """Calculate current net worth"""
+    total_savings = calculate_total_savings(data)
     return (
-        data["net_worth"]["savings_account"] +
+        total_savings +
         data["net_worth"]["investment_account"] +
         data["net_worth"]["other_assets"]
     )
@@ -83,7 +92,7 @@ def simulate_year_end_networth(data, years=1):
     monthly_surplus = monthly_income - monthly_expenses - monthly_savings_contribution - monthly_investment_contribution
     
     current_networth = calculate_current_net_worth(data)
-    current_savings = data["net_worth"]["savings_account"]
+    current_savings = calculate_total_savings(data)
     current_investments = data["net_worth"]["investment_account"]
     
     # Simple simulation (assuming no interest/growth for now)
@@ -153,8 +162,9 @@ if page == "📊 Dashboard":
     
     with col1:
         st.subheader("Net Worth Breakdown")
+        total_savings = calculate_total_savings(data)
         networth_data = {
-            "Savings Account": data["net_worth"]["savings_account"],
+            "Savings Accounts": total_savings,
             "Investment Account": data["net_worth"]["investment_account"],
             "Other Assets": data["net_worth"]["other_assets"]
         }
@@ -287,15 +297,93 @@ elif page == "💰 Savings & Investments":
     tab1, tab2, tab3 = st.tabs(["💾 Savings Account", "📈 Investment Account", "📊 Net Worth"])
     
     with tab1:
-        st.subheader("Savings Account")
+        st.subheader("Savings Accounts")
         
-        current_savings = st.number_input(
-            "Current Savings Balance",
-            min_value=0.0,
-            value=float(data["net_worth"]["savings_account"]),
-            step=100.0
-        )
-        data["net_worth"]["savings_account"] = current_savings
+        # Initialize savings_accounts if it doesn't exist or is old format
+        if "savings_accounts" not in data["net_worth"] or not isinstance(data["net_worth"]["savings_accounts"], list):
+            # Migrate old format to new format
+            if "savings_account" in data["net_worth"] and data["net_worth"]["savings_account"] > 0:
+                data["net_worth"]["savings_accounts"] = [{
+                    "name": "Main Savings Account",
+                    "balance": data["net_worth"]["savings_account"]
+                }]
+            else:
+                data["net_worth"]["savings_accounts"] = []
+        
+        savings_accounts = data["net_worth"]["savings_accounts"]
+        total_savings = calculate_total_savings(data)
+        
+        # Display total savings
+        st.metric("Total Savings Across All Accounts", f"€{total_savings:,.2f}")
+        
+        st.divider()
+        
+        # Add new account button
+        if st.button("➕ Add New Savings Account"):
+            if "new_savings_account" not in st.session_state:
+                st.session_state.new_savings_account = True
+        
+        # Form to add new account
+        if st.session_state.get("new_savings_account", False):
+            with st.form("add_savings_account"):
+                account_name = st.text_input("Account Name (e.g., Bank Name)", placeholder="e.g., Banco Santander")
+                initial_balance = st.number_input("Initial Balance", min_value=0.0, value=0.0, step=100.0)
+                submitted = st.form_submit_button("Add Account")
+                if submitted and account_name:
+                    savings_accounts.append({
+                        "name": account_name,
+                        "balance": initial_balance
+                    })
+                    st.session_state.new_savings_account = False
+                    st.rerun()
+        
+        st.divider()
+        
+        # Display and manage existing accounts
+        if savings_accounts:
+            st.subheader("Your Savings Accounts")
+            
+            for idx, account in enumerate(savings_accounts):
+                with st.expander(f"🏦 {account.get('name', 'Unnamed Account')} - €{account.get('balance', 0):,.2f}", expanded=False):
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        new_name = st.text_input(
+                            "Account Name",
+                            value=account.get('name', ''),
+                            key=f"savings_name_{idx}"
+                        )
+                        new_balance = st.number_input(
+                            "Balance",
+                            min_value=0.0,
+                            value=float(account.get('balance', 0)),
+                            step=100.0,
+                            key=f"savings_balance_{idx}"
+                        )
+                    
+                    with col2:
+                        st.write("")  # Spacing
+                        if st.button("💾 Update", key=f"update_savings_{idx}"):
+                            savings_accounts[idx]["name"] = new_name
+                            savings_accounts[idx]["balance"] = new_balance
+                            st.rerun()
+                        if st.button("🗑️ Delete", key=f"delete_savings_{idx}"):
+                            savings_accounts.pop(idx)
+                            st.rerun()
+            
+            # Display summary table
+            st.divider()
+            st.subheader("Summary")
+            summary_data = []
+            for account in savings_accounts:
+                summary_data.append({
+                    "Account Name": account.get('name', 'Unnamed'),
+                    "Balance": f"€{account.get('balance', 0):,.2f}"
+                })
+            summary_df = pd.DataFrame(summary_data)
+            st.dataframe(summary_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No savings accounts added yet. Click 'Add New Savings Account' to get started.")
         
         st.divider()
         st.subheader("Monthly Contributions")
@@ -306,26 +394,46 @@ elif page == "💰 Savings & Investments":
         
         if st.session_state.get("new_savings_contribution", False):
             with st.form("add_savings_contribution"):
+                if savings_accounts:
+                    account_names = [acc.get('name', 'Unnamed') for acc in savings_accounts]
+                    selected_account = st.selectbox("Select Account", account_names)
+                else:
+                    selected_account = None
+                    st.info("Add a savings account first to track contributions")
+                
                 amount = st.number_input("Contribution Amount", min_value=0.0, step=50.0)
                 date = st.date_input("Date", value=datetime.now())
                 submitted = st.form_submit_button("Add Contribution")
-                if submitted:
-                    data["savings_contributions"].append({
+                if submitted and amount > 0:
+                    contribution_data = {
                         "amount": amount,
                         "date": date.strftime("%Y-%m-%d")
-                    })
-                    data["net_worth"]["savings_account"] += amount
+                    }
+                    if selected_account:
+                        contribution_data["account"] = selected_account
+                    
+                    data["savings_contributions"].append(contribution_data)
+                    
+                    # Update account balance if account is selected
+                    if selected_account:
+                        for acc in savings_accounts:
+                            if acc.get('name') == selected_account:
+                                acc["balance"] = acc.get("balance", 0) + amount
+                                break
+                    
                     data["transactions"].append({
                         "type": "savings",
                         "amount": amount,
-                        "date": date.strftime("%Y-%m-%d")
+                        "date": date.strftime("%Y-%m-%d"),
+                        "account": selected_account if selected_account else "General"
                     })
                     st.session_state.new_savings_contribution = False
                     st.rerun()
         
         if data["savings_contributions"]:
             contrib_df = pd.DataFrame(data["savings_contributions"])
-            contrib_df["amount"] = contrib_df["amount"].apply(lambda x: f"€{x:,.2f}")
+            if "amount" in contrib_df.columns:
+                contrib_df["amount"] = contrib_df["amount"].apply(lambda x: f"€{x:,.2f}")
             st.dataframe(contrib_df, use_container_width=True, hide_index=True)
             
             total_contributions = sum(c.get("amount", 0) for c in data["savings_contributions"])
@@ -393,8 +501,9 @@ elif page == "💰 Savings & Investments":
         
         st.divider()
         
+        total_savings = calculate_total_savings(data)
         networth_breakdown = {
-            "Savings Account": data["net_worth"]["savings_account"],
+            "Savings Accounts": total_savings,
             "Investment Account": data["net_worth"]["investment_account"],
             "Other Assets": data["net_worth"]["other_assets"]
         }
@@ -403,6 +512,14 @@ elif page == "💰 Savings & Investments":
         st.metric("Total Net Worth", f"€{total_networth:,.2f}")
         
         st.bar_chart(networth_breakdown)
+        
+        # Show breakdown of savings accounts if any exist
+        savings_accounts = data["net_worth"].get("savings_accounts", [])
+        if savings_accounts and isinstance(savings_accounts, list):
+            st.divider()
+            st.subheader("Savings Accounts Breakdown")
+            savings_breakdown = {acc.get('name', 'Unnamed'): acc.get('balance', 0) for acc in savings_accounts}
+            st.bar_chart(savings_breakdown)
 
 # Simulator Page
 elif page == "🔮 Simulator":
@@ -460,7 +577,7 @@ elif page == "⚙️ Settings":
             data = {
                 "net_worth": {
                     "current": 0,
-                    "savings_account": 0,
+                    "savings_accounts": [],
                     "investment_account": 0,
                     "other_assets": 0
                 },
