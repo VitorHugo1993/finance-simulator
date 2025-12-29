@@ -228,26 +228,69 @@ elif page == "💵 Income & Expenses":
     with tab2:
         st.subheader("Fixed Monthly Expenses")
         
-        if st.button("➕ Add Fixed Expense"):
-            if "new_fixed_expense" not in st.session_state:
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("➕ Add Fixed Expense"):
                 st.session_state.new_fixed_expense = True
         
         if st.session_state.get("new_fixed_expense", False):
-            with st.form("add_fixed_expense"):
+            with st.form("add_fixed_expense", clear_on_submit=True):
                 name = st.text_input("Expense Name")
                 amount = st.number_input("Amount", min_value=0.0, step=10.0)
-                submitted = st.form_submit_button("Add Expense")
+                col1, col2 = st.columns(2)
+                with col1:
+                    submitted = st.form_submit_button("✅ Add Expense", use_container_width=True)
+                with col2:
+                    cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
+                
                 if submitted and name:
                     data["fixed_expenses"].append({"name": name, "amount": amount})
                     st.session_state.new_fixed_expense = False
                     st.rerun()
+                elif cancelled:
+                    st.session_state.new_fixed_expense = False
+                    st.rerun()
         
         if data["fixed_expenses"]:
-            expenses_df = pd.DataFrame(data["fixed_expenses"])
-            expenses_df["amount"] = expenses_df["amount"].apply(lambda x: f"€{x:,.2f}")
-            st.dataframe(expenses_df, use_container_width=True, hide_index=True)
+            # Display expenses with edit/delete options
+            for idx, expense in enumerate(data["fixed_expenses"]):
+                col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
+                with col1:
+                    st.write(f"**{expense.get('name', 'Unnamed')}**")
+                with col2:
+                    st.write(f"€{expense.get('amount', 0):,.2f}")
+                with col3:
+                    if st.button("✏️", key=f"edit_fixed_{idx}"):
+                        st.session_state[f"editing_fixed_{idx}"] = True
+                with col4:
+                    if st.button("🗑️", key=f"delete_fixed_{idx}"):
+                        data["fixed_expenses"].pop(idx)
+                        st.rerun()
+                
+                # Edit form
+                if st.session_state.get(f"editing_fixed_{idx}", False):
+                    with st.form(f"edit_fixed_expense_{idx}"):
+                        new_name = st.text_input("Expense Name", value=expense.get('name', ''), key=f"edit_name_{idx}")
+                        new_amount = st.number_input("Amount", min_value=0.0, value=float(expense.get('amount', 0)), step=10.0, key=f"edit_amount_{idx}")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Save", use_container_width=True):
+                                data["fixed_expenses"][idx]["name"] = new_name
+                                data["fixed_expenses"][idx]["amount"] = new_amount
+                                st.session_state[f"editing_fixed_{idx}"] = False
+                                st.rerun()
+                        with col2:
+                            if st.form_submit_button("❌ Cancel", use_container_width=True):
+                                st.session_state[f"editing_fixed_{idx}"] = False
+                                st.rerun()
             
-            # Delete option
+            st.divider()
+            
+            # Summary
+            total_fixed = sum(exp.get("amount", 0) for exp in data["fixed_expenses"])
+            st.metric("Total Fixed Expenses", f"€{total_fixed:,.2f}")
+            
+            # Delete all option
             if st.button("🗑️ Delete All Fixed Expenses"):
                 data["fixed_expenses"] = []
                 st.rerun()
