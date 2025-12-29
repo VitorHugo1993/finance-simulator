@@ -1,0 +1,459 @@
+import streamlit as st
+import pandas as pd
+import json
+import os
+from datetime import datetime, timedelta
+from pathlib import Path
+
+# Page configuration
+st.set_page_config(
+    page_title="Budget Tracker",
+    page_icon="💰",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Data file path
+DATA_FILE = "budget_data.json"
+
+def load_data():
+    """Load financial data from JSON file"""
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, 'r') as f:
+            return json.load(f)
+    return {
+        "net_worth": {
+            "current": 0,
+            "savings_account": 0,
+            "investment_account": 0,
+            "other_assets": 0
+        },
+        "income": {
+            "user_salary": 0,
+            "partner_salary": 0
+        },
+        "fixed_expenses": [],
+        "variable_expenses": [],
+        "savings_contributions": [],
+        "investment_contributions": [],
+        "transactions": []
+    }
+
+def save_data(data):
+    """Save financial data to JSON file"""
+    with open(DATA_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+
+def calculate_total_expenses(data):
+    """Calculate total monthly expenses"""
+    fixed_total = sum(exp.get("amount", 0) for exp in data["fixed_expenses"])
+    variable_total = sum(exp.get("amount", 0) for exp in data["variable_expenses"])
+    return fixed_total + variable_total
+
+def calculate_total_income(data):
+    """Calculate total monthly income"""
+    return data["income"]["user_salary"] + data["income"]["partner_salary"]
+
+def calculate_current_net_worth(data):
+    """Calculate current net worth"""
+    return (
+        data["net_worth"]["savings_account"] +
+        data["net_worth"]["investment_account"] +
+        data["net_worth"]["other_assets"]
+    )
+
+def simulate_year_end_networth(data, years=1):
+    """Simulate net worth at end of year(s)"""
+    monthly_income = calculate_total_income(data)
+    monthly_expenses = calculate_total_expenses(data)
+    monthly_savings_contribution = sum(
+        contrib.get("amount", 0) for contrib in data["savings_contributions"]
+    )
+    monthly_investment_contribution = sum(
+        contrib.get("amount", 0) for contrib in data["investment_contributions"]
+    )
+    
+    monthly_surplus = monthly_income - monthly_expenses - monthly_savings_contribution - monthly_investment_contribution
+    
+    current_networth = calculate_current_net_worth(data)
+    current_savings = data["net_worth"]["savings_account"]
+    current_investments = data["net_worth"]["investment_account"]
+    
+    # Simple simulation (assuming no interest/growth for now)
+    # User can add investment returns later
+    projected_savings = current_savings + (monthly_savings_contribution * 12 * years)
+    projected_investments = current_investments + (monthly_investment_contribution * 12 * years)
+    projected_networth = (
+        current_networth +
+        (monthly_surplus * 12 * years) +
+        (monthly_savings_contribution * 12 * years) +
+        (monthly_investment_contribution * 12 * years)
+    )
+    
+    return {
+        "years": years,
+        "current_networth": current_networth,
+        "projected_networth": projected_networth,
+        "monthly_income": monthly_income,
+        "monthly_expenses": monthly_expenses,
+        "monthly_surplus": monthly_surplus,
+        "projected_savings": projected_savings,
+        "projected_investments": projected_investments
+    }
+
+# Load data
+if 'data' not in st.session_state:
+    st.session_state.data = load_data()
+
+data = st.session_state.data
+
+# Sidebar navigation
+st.sidebar.title("💰 Budget Tracker")
+page = st.sidebar.radio(
+    "Navigation",
+    ["📊 Dashboard", "💵 Income & Expenses", "💰 Savings & Investments", "🔮 Simulator", "⚙️ Settings"]
+)
+
+# Dashboard Page
+if page == "📊 Dashboard":
+    st.title("📊 Financial Dashboard")
+    
+    # Net Worth Card
+    current_networth = calculate_current_net_worth(data)
+    total_income = calculate_total_income(data)
+    total_expenses = calculate_total_expenses(data)
+    monthly_surplus = total_income - total_expenses
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Net Worth", f"€{current_networth:,.2f}")
+    
+    with col2:
+        st.metric("Monthly Income", f"€{total_income:,.2f}")
+    
+    with col3:
+        st.metric("Monthly Expenses", f"€{total_expenses:,.2f}")
+    
+    with col4:
+        st.metric("Monthly Surplus", f"€{monthly_surplus:,.2f}", 
+                 delta=f"{monthly_surplus/total_income*100:.1f}%" if total_income > 0 else "0%")
+    
+    st.divider()
+    
+    # Net Worth Breakdown
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Net Worth Breakdown")
+        networth_data = {
+            "Savings Account": data["net_worth"]["savings_account"],
+            "Investment Account": data["net_worth"]["investment_account"],
+            "Other Assets": data["net_worth"]["other_assets"]
+        }
+        st.bar_chart(networth_data)
+    
+    with col2:
+        st.subheader("Monthly Cash Flow")
+        cashflow_data = {
+            "Income": total_income,
+            "Expenses": total_expenses,
+            "Surplus": max(0, monthly_surplus)
+        }
+        st.bar_chart(cashflow_data)
+    
+    # Recent Transactions
+    if data.get("transactions"):
+        st.subheader("Recent Transactions")
+        transactions_df = pd.DataFrame(data["transactions"][-10:])
+        st.dataframe(transactions_df, use_container_width=True, hide_index=True)
+
+# Income & Expenses Page
+elif page == "💵 Income & Expenses":
+    st.title("💵 Income & Expenses")
+    
+    tab1, tab2, tab3 = st.tabs(["💰 Income", "📋 Fixed Expenses", "🛒 Variable Expenses"])
+    
+    with tab1:
+        st.subheader("Monthly Income")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            user_salary = st.number_input("Your Monthly Salary", min_value=0.0, value=float(data["income"]["user_salary"]), step=100.0)
+            data["income"]["user_salary"] = user_salary
+        
+        with col2:
+            partner_salary = st.number_input("Partner's Monthly Salary", min_value=0.0, value=float(data["income"]["partner_salary"]), step=100.0)
+            data["income"]["partner_salary"] = partner_salary
+        
+        total_income = user_salary + partner_salary
+        st.metric("Total Monthly Income", f"€{total_income:,.2f}")
+    
+    with tab2:
+        st.subheader("Fixed Monthly Expenses")
+        
+        if st.button("➕ Add Fixed Expense"):
+            if "new_fixed_expense" not in st.session_state:
+                st.session_state.new_fixed_expense = True
+        
+        if st.session_state.get("new_fixed_expense", False):
+            with st.form("add_fixed_expense"):
+                name = st.text_input("Expense Name")
+                amount = st.number_input("Amount", min_value=0.0, step=10.0)
+                submitted = st.form_submit_button("Add Expense")
+                if submitted and name:
+                    data["fixed_expenses"].append({"name": name, "amount": amount})
+                    st.session_state.new_fixed_expense = False
+                    st.rerun()
+        
+        if data["fixed_expenses"]:
+            expenses_df = pd.DataFrame(data["fixed_expenses"])
+            expenses_df["amount"] = expenses_df["amount"].apply(lambda x: f"€{x:,.2f}")
+            st.dataframe(expenses_df, use_container_width=True, hide_index=True)
+            
+            # Delete option
+            if st.button("🗑️ Delete All Fixed Expenses"):
+                data["fixed_expenses"] = []
+                st.rerun()
+        else:
+            st.info("No fixed expenses added yet.")
+    
+    with tab3:
+        st.subheader("Variable Expenses")
+        
+        if st.button("➕ Add Variable Expense"):
+            if "new_variable_expense" not in st.session_state:
+                st.session_state.new_variable_expense = True
+        
+        if st.session_state.get("new_variable_expense", False):
+            with st.form("add_variable_expense"):
+                name = st.text_input("Expense Name")
+                amount = st.number_input("Amount", min_value=0.0, step=10.0)
+                date = st.date_input("Date", value=datetime.now())
+                submitted = st.form_submit_button("Add Expense")
+                if submitted and name:
+                    data["variable_expenses"].append({
+                        "name": name,
+                        "amount": amount,
+                        "date": date.strftime("%Y-%m-%d")
+                    })
+                    data["transactions"].append({
+                        "type": "expense",
+                        "category": "variable",
+                        "name": name,
+                        "amount": -amount,
+                        "date": date.strftime("%Y-%m-%d")
+                    })
+                    st.session_state.new_variable_expense = False
+                    st.rerun()
+        
+        if data["variable_expenses"]:
+            expenses_df = pd.DataFrame(data["variable_expenses"])
+            expenses_df["amount"] = expenses_df["amount"].apply(lambda x: f"€{x:,.2f}")
+            st.dataframe(expenses_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No variable expenses added yet.")
+
+# Savings & Investments Page
+elif page == "💰 Savings & Investments":
+    st.title("💰 Savings & Investments")
+    
+    tab1, tab2, tab3 = st.tabs(["💾 Savings Account", "📈 Investment Account", "📊 Net Worth"])
+    
+    with tab1:
+        st.subheader("Savings Account")
+        
+        current_savings = st.number_input(
+            "Current Savings Balance",
+            min_value=0.0,
+            value=float(data["net_worth"]["savings_account"]),
+            step=100.0
+        )
+        data["net_worth"]["savings_account"] = current_savings
+        
+        st.divider()
+        st.subheader("Monthly Contributions")
+        
+        if st.button("➕ Add Savings Contribution"):
+            if "new_savings_contribution" not in st.session_state:
+                st.session_state.new_savings_contribution = True
+        
+        if st.session_state.get("new_savings_contribution", False):
+            with st.form("add_savings_contribution"):
+                amount = st.number_input("Contribution Amount", min_value=0.0, step=50.0)
+                date = st.date_input("Date", value=datetime.now())
+                submitted = st.form_submit_button("Add Contribution")
+                if submitted:
+                    data["savings_contributions"].append({
+                        "amount": amount,
+                        "date": date.strftime("%Y-%m-%d")
+                    })
+                    data["net_worth"]["savings_account"] += amount
+                    data["transactions"].append({
+                        "type": "savings",
+                        "amount": amount,
+                        "date": date.strftime("%Y-%m-%d")
+                    })
+                    st.session_state.new_savings_contribution = False
+                    st.rerun()
+        
+        if data["savings_contributions"]:
+            contrib_df = pd.DataFrame(data["savings_contributions"])
+            contrib_df["amount"] = contrib_df["amount"].apply(lambda x: f"€{x:,.2f}")
+            st.dataframe(contrib_df, use_container_width=True, hide_index=True)
+            
+            total_contributions = sum(c.get("amount", 0) for c in data["savings_contributions"])
+            st.metric("Total Contributions", f"€{total_contributions:,.2f}")
+        else:
+            st.info("No savings contributions recorded yet.")
+    
+    with tab2:
+        st.subheader("Investment Account")
+        
+        current_investments = st.number_input(
+            "Current Investment Balance",
+            min_value=0.0,
+            value=float(data["net_worth"]["investment_account"]),
+            step=100.0
+        )
+        data["net_worth"]["investment_account"] = current_investments
+        
+        st.divider()
+        st.subheader("Monthly Contributions")
+        
+        if st.button("➕ Add Investment Contribution"):
+            if "new_investment_contribution" not in st.session_state:
+                st.session_state.new_investment_contribution = True
+        
+        if st.session_state.get("new_investment_contribution", False):
+            with st.form("add_investment_contribution"):
+                amount = st.number_input("Contribution Amount", min_value=0.0, step=50.0)
+                date = st.date_input("Date", value=datetime.now())
+                submitted = st.form_submit_button("Add Contribution")
+                if submitted:
+                    data["investment_contributions"].append({
+                        "amount": amount,
+                        "date": date.strftime("%Y-%m-%d")
+                    })
+                    data["net_worth"]["investment_account"] += amount
+                    data["transactions"].append({
+                        "type": "investment",
+                        "amount": amount,
+                        "date": date.strftime("%Y-%m-%d")
+                    })
+                    st.session_state.new_investment_contribution = False
+                    st.rerun()
+        
+        if data["investment_contributions"]:
+            contrib_df = pd.DataFrame(data["investment_contributions"])
+            contrib_df["amount"] = contrib_df["amount"].apply(lambda x: f"€{x:,.2f}")
+            st.dataframe(contrib_df, use_container_width=True, hide_index=True)
+            
+            total_contributions = sum(c.get("amount", 0) for c in data["investment_contributions"])
+            st.metric("Total Contributions", f"€{total_contributions:,.2f}")
+        else:
+            st.info("No investment contributions recorded yet.")
+    
+    with tab3:
+        st.subheader("Net Worth Overview")
+        
+        other_assets = st.number_input(
+            "Other Assets",
+            min_value=0.0,
+            value=float(data["net_worth"]["other_assets"]),
+            step=100.0
+        )
+        data["net_worth"]["other_assets"] = other_assets
+        
+        st.divider()
+        
+        networth_breakdown = {
+            "Savings Account": data["net_worth"]["savings_account"],
+            "Investment Account": data["net_worth"]["investment_account"],
+            "Other Assets": data["net_worth"]["other_assets"]
+        }
+        
+        total_networth = sum(networth_breakdown.values())
+        st.metric("Total Net Worth", f"€{total_networth:,.2f}")
+        
+        st.bar_chart(networth_breakdown)
+
+# Simulator Page
+elif page == "🔮 Simulator":
+    st.title("🔮 Net Worth Simulator")
+    
+    st.markdown("Simulate your net worth at the end of the year based on your current financial situation.")
+    
+    years = st.slider("Number of Years to Simulate", min_value=1, max_value=10, value=1)
+    
+    if st.button("🚀 Run Simulation"):
+        simulation = simulate_year_end_networth(data, years)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric("Current Net Worth", f"€{simulation['current_networth']:,.2f}")
+            st.metric("Projected Net Worth", f"€{simulation['projected_networth']:,.2f}")
+            difference = simulation['projected_networth'] - simulation['current_networth']
+            st.metric("Projected Growth", f"€{difference:,.2f}", 
+                     delta=f"{(difference/simulation['current_networth']*100):.1f}%" if simulation['current_networth'] > 0 else "0%")
+        
+        with col2:
+            st.metric("Monthly Income", f"€{simulation['monthly_income']:,.2f}")
+            st.metric("Monthly Expenses", f"€{simulation['monthly_expenses']:,.2f}")
+            st.metric("Monthly Surplus", f"€{simulation['monthly_surplus']:,.2f}")
+        
+        st.divider()
+        
+        st.subheader("Projected Breakdown")
+        projected_data = {
+            "Current": simulation['current_networth'],
+            "Projected": simulation['projected_networth']
+        }
+        st.bar_chart(projected_data)
+        
+        st.subheader("Account Projections")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Projected Savings", f"€{simulation['projected_savings']:,.2f}")
+        with col2:
+            st.metric("Projected Investments", f"€{simulation['projected_investments']:,.2f}")
+
+# Settings Page
+elif page == "⚙️ Settings":
+    st.title("⚙️ Settings")
+    
+    st.subheader("Data Management")
+    
+    if st.button("💾 Save All Data"):
+        save_data(data)
+        st.success("Data saved successfully!")
+    
+    if st.button("🔄 Reset All Data"):
+        if st.checkbox("I understand this will delete all my data"):
+            data = {
+                "net_worth": {
+                    "current": 0,
+                    "savings_account": 0,
+                    "investment_account": 0,
+                    "other_assets": 0
+                },
+                "income": {
+                    "user_salary": 0,
+                    "partner_salary": 0
+                },
+                "fixed_expenses": [],
+                "variable_expenses": [],
+                "savings_contributions": [],
+                "investment_contributions": [],
+                "transactions": []
+            }
+            st.session_state.data = data
+            save_data(data)
+            st.success("Data reset successfully!")
+            st.rerun()
+
+# Auto-save on changes
+save_data(data)
+st.session_state.data = data
+

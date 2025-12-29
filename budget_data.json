@@ -1,0 +1,17 @@
+{
+  "net_worth": {
+    "current": 0,
+    "savings_account": 0,
+    "investment_account": 0,
+    "other_assets": 0
+  },
+  "income": {
+    "user_salary": 2800.0,
+    "partner_salary": 0.0
+  },
+  "fixed_expenses": [],
+  "variable_expenses": [],
+  "savings_contributions": [],
+  "investment_contributions": [],
+  "transactions": []
+}
