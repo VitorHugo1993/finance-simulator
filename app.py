@@ -36,7 +36,9 @@ def load_data():
         "fixed_expenses": [],
         "variable_expenses": [],
         "savings_contributions": [],
+        "savings_recurring_monthly": [],
         "investment_contributions": [],
+        "investment_recurring_monthly": [],
         "transactions": []
     }
 
@@ -82,11 +84,12 @@ def simulate_year_end_networth(data, years=1):
     """Simulate net worth at end of year(s)"""
     monthly_income = calculate_total_income(data)
     monthly_expenses = calculate_total_expenses(data)
+    # Calculate monthly contributions from recurring monthly contributions
     monthly_savings_contribution = sum(
-        contrib.get("amount", 0) for contrib in data["savings_contributions"]
+        contrib.get("amount", 0) for contrib in data.get("savings_recurring_monthly", [])
     )
     monthly_investment_contribution = sum(
-        contrib.get("amount", 0) for contrib in data["investment_contributions"]
+        contrib.get("amount", 0) for contrib in data.get("investment_recurring_monthly", [])
     )
     
     monthly_surplus = monthly_income - monthly_expenses - monthly_savings_contribution - monthly_investment_contribution
@@ -510,15 +513,104 @@ elif page == "💰 Savings & Investments":
             st.info("No savings accounts added yet. Click 'Add New Savings Account' to get started.")
         
         st.divider()
-        st.subheader("Monthly Contributions")
-        st.caption("💡 Monthly contributions are considered as consistent 12-month contributions (regardless of salary months)")
+        st.subheader("Recurring Monthly Contributions")
+        st.caption("💡 Set up recurring monthly contributions that will be applied consistently every month (12 months per year)")
         
-        if st.button("➕ Add Savings Contribution"):
+        # Initialize recurring monthly if it doesn't exist
+        if "savings_recurring_monthly" not in data:
+            data["savings_recurring_monthly"] = []
+        
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("➕ Add Recurring Contribution"):
+                st.session_state.new_savings_recurring = True
+        
+        if st.session_state.get("new_savings_recurring", False):
+            with st.form("add_savings_recurring", clear_on_submit=True):
+                if savings_accounts:
+                    account_names = [acc.get('name', 'Unnamed') for acc in savings_accounts]
+                    selected_account = st.selectbox("Select Account", account_names)
+                else:
+                    selected_account = None
+                    st.info("Add a savings account first to track contributions")
+                
+                amount = st.number_input("Monthly Contribution Amount", min_value=0.0, step=50.0)
+                col1, col2 = st.columns(2)
+                with col1:
+                    submitted = st.form_submit_button("✅ Add Recurring", use_container_width=True)
+                with col2:
+                    cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
+                
+                if submitted and amount > 0:
+                    contribution_data = {
+                        "amount": amount,
+                        "account": selected_account if selected_account else "General"
+                    }
+                    data["savings_recurring_monthly"].append(contribution_data)
+                    st.session_state.new_savings_recurring = False
+                    st.rerun()
+                elif cancelled:
+                    st.session_state.new_savings_recurring = False
+                    st.rerun()
+        
+        # Display recurring monthly contributions
+        if data["savings_recurring_monthly"]:
+            st.write("**Active Recurring Monthly Contributions:**")
+            for idx, contrib in enumerate(data["savings_recurring_monthly"]):
+                col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
+                with col1:
+                    st.write(f"**{contrib.get('account', 'General')}**")
+                with col2:
+                    st.write(f"€{contrib.get('amount', 0):,.2f} per month")
+                with col3:
+                    if st.button("✏️", key=f"edit_savings_recurring_{idx}"):
+                        st.session_state[f"editing_savings_recurring_{idx}"] = True
+                with col4:
+                    if st.button("🗑️", key=f"delete_savings_recurring_{idx}"):
+                        data["savings_recurring_monthly"].pop(idx)
+                        st.rerun()
+                
+                # Edit form
+                if st.session_state.get(f"editing_savings_recurring_{idx}", False):
+                    with st.form(f"edit_savings_recurring_{idx}"):
+                        if savings_accounts:
+                            account_names = [acc.get('name', 'Unnamed') for acc in savings_accounts]
+                            current_account = contrib.get('account', 'General')
+                            account_idx = account_names.index(current_account) if current_account in account_names else 0
+                            new_account = st.selectbox("Account", account_names, index=account_idx, key=f"recurring_account_{idx}")
+                        else:
+                            new_account = contrib.get('account', 'General')
+                        
+                        new_amount = st.number_input("Monthly Amount", min_value=0.0, value=float(contrib.get('amount', 0)), step=50.0, key=f"recurring_amount_{idx}")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Save", use_container_width=True):
+                                data["savings_recurring_monthly"][idx]["account"] = new_account
+                                data["savings_recurring_monthly"][idx]["amount"] = new_amount
+                                st.session_state[f"editing_savings_recurring_{idx}"] = False
+                                st.rerun()
+                        with col2:
+                            if st.form_submit_button("❌ Cancel", use_container_width=True):
+                                st.session_state[f"editing_savings_recurring_{idx}"] = False
+                                st.rerun()
+            
+            total_monthly = sum(c.get("amount", 0) for c in data["savings_recurring_monthly"])
+            yearly_total = total_monthly * 12
+            st.metric("Total Monthly Recurring", f"€{total_monthly:,.2f}")
+            st.metric("Yearly Total (12 months)", f"€{yearly_total:,.2f}")
+        else:
+            st.info("No recurring monthly contributions set up yet.")
+        
+        st.divider()
+        st.subheader("One-Time Contributions")
+        st.caption("💡 Record individual one-time contributions")
+        
+        if st.button("➕ Add One-Time Contribution"):
             if "new_savings_contribution" not in st.session_state:
                 st.session_state.new_savings_contribution = True
         
         if st.session_state.get("new_savings_contribution", False):
-            with st.form("add_savings_contribution"):
+            with st.form("add_savings_contribution", clear_on_submit=True):
                 if savings_accounts:
                     account_names = [acc.get('name', 'Unnamed') for acc in savings_accounts]
                     selected_account = st.selectbox("Select Account", account_names)
@@ -528,7 +620,12 @@ elif page == "💰 Savings & Investments":
                 
                 amount = st.number_input("Contribution Amount", min_value=0.0, step=50.0)
                 date = st.date_input("Date", value=datetime.now())
-                submitted = st.form_submit_button("Add Contribution")
+                col1, col2 = st.columns(2)
+                with col1:
+                    submitted = st.form_submit_button("✅ Add", use_container_width=True)
+                with col2:
+                    cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
+                
                 if submitted and amount > 0:
                     contribution_data = {
                         "amount": amount,
@@ -554,6 +651,9 @@ elif page == "💰 Savings & Investments":
                     })
                     st.session_state.new_savings_contribution = False
                     st.rerun()
+                elif cancelled:
+                    st.session_state.new_savings_contribution = False
+                    st.rerun()
         
         if data["savings_contributions"]:
             contrib_df = pd.DataFrame(data["savings_contributions"])
@@ -561,10 +661,10 @@ elif page == "💰 Savings & Investments":
                 contrib_df["amount"] = contrib_df["amount"].apply(lambda x: f"€{x:,.2f}")
             st.dataframe(contrib_df, use_container_width=True, hide_index=True)
             
-            total_contributions = sum(c.get("amount", 0) for c in data["savings_contributions"])
-            st.metric("Total Contributions", f"€{total_contributions:,.2f}")
+            total_one_time = sum(c.get("amount", 0) for c in data["savings_contributions"])
+            st.metric("Total One-Time Contributions", f"€{total_one_time:,.2f}")
         else:
-            st.info("No savings contributions recorded yet.")
+            st.info("No one-time contributions recorded yet.")
     
     with tab2:
         st.subheader("Investment Account")
@@ -578,19 +678,96 @@ elif page == "💰 Savings & Investments":
         data["net_worth"]["investment_account"] = current_investments
         
         st.divider()
-        st.subheader("Monthly Contributions")
-        st.caption("💡 Monthly contributions are considered as consistent 12-month contributions (regardless of salary months)")
+        st.subheader("Recurring Monthly Contributions")
+        st.caption("💡 Set up recurring monthly contributions that will be applied consistently every month (12 months per year)")
         
-        if st.button("➕ Add Investment Contribution"):
+        # Initialize recurring monthly if it doesn't exist
+        if "investment_recurring_monthly" not in data:
+            data["investment_recurring_monthly"] = []
+        
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("➕ Add Recurring Contribution"):
+                st.session_state.new_investment_recurring = True
+        
+        if st.session_state.get("new_investment_recurring", False):
+            with st.form("add_investment_recurring", clear_on_submit=True):
+                amount = st.number_input("Monthly Contribution Amount", min_value=0.0, step=50.0)
+                col1, col2 = st.columns(2)
+                with col1:
+                    submitted = st.form_submit_button("✅ Add Recurring", use_container_width=True)
+                with col2:
+                    cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
+                
+                if submitted and amount > 0:
+                    contribution_data = {
+                        "amount": amount
+                    }
+                    data["investment_recurring_monthly"].append(contribution_data)
+                    st.session_state.new_investment_recurring = False
+                    st.rerun()
+                elif cancelled:
+                    st.session_state.new_investment_recurring = False
+                    st.rerun()
+        
+        # Display recurring monthly contributions
+        if data["investment_recurring_monthly"]:
+            st.write("**Active Recurring Monthly Contributions:**")
+            for idx, contrib in enumerate(data["investment_recurring_monthly"]):
+                col1, col2, col3, col4 = st.columns([4, 2, 1, 1])
+                with col1:
+                    st.write("**Investment Account**")
+                with col2:
+                    st.write(f"€{contrib.get('amount', 0):,.2f} per month")
+                with col3:
+                    if st.button("✏️", key=f"edit_investment_recurring_{idx}"):
+                        st.session_state[f"editing_investment_recurring_{idx}"] = True
+                with col4:
+                    if st.button("🗑️", key=f"delete_investment_recurring_{idx}"):
+                        data["investment_recurring_monthly"].pop(idx)
+                        st.rerun()
+                
+                # Edit form
+                if st.session_state.get(f"editing_investment_recurring_{idx}", False):
+                    with st.form(f"edit_investment_recurring_{idx}"):
+                        new_amount = st.number_input("Monthly Amount", min_value=0.0, value=float(contrib.get('amount', 0)), step=50.0, key=f"inv_recurring_amount_{idx}")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Save", use_container_width=True):
+                                data["investment_recurring_monthly"][idx]["amount"] = new_amount
+                                st.session_state[f"editing_investment_recurring_{idx}"] = False
+                                st.rerun()
+                        with col2:
+                            if st.form_submit_button("❌ Cancel", use_container_width=True):
+                                st.session_state[f"editing_investment_recurring_{idx}"] = False
+                                st.rerun()
+            
+            total_monthly = sum(c.get("amount", 0) for c in data["investment_recurring_monthly"])
+            yearly_total = total_monthly * 12
+            st.metric("Total Monthly Recurring", f"€{total_monthly:,.2f}")
+            st.metric("Yearly Total (12 months)", f"€{yearly_total:,.2f}")
+        else:
+            st.info("No recurring monthly contributions set up yet.")
+        
+        st.divider()
+        st.subheader("One-Time Contributions")
+        st.caption("💡 Record individual one-time contributions")
+        
+        if st.button("➕ Add One-Time Contribution"):
             if "new_investment_contribution" not in st.session_state:
                 st.session_state.new_investment_contribution = True
         
         if st.session_state.get("new_investment_contribution", False):
-            with st.form("add_investment_contribution"):
+            with st.form("add_investment_contribution", clear_on_submit=True):
                 amount = st.number_input("Contribution Amount", min_value=0.0, step=50.0)
                 date = st.date_input("Date", value=datetime.now())
-                submitted = st.form_submit_button("Add Contribution")
-                if submitted:
+                col1, col2 = st.columns(2)
+                with col1:
+                    submitted = st.form_submit_button("✅ Add", use_container_width=True)
+                with col2:
+                    cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
+                
+                if submitted and amount > 0:
                     data["investment_contributions"].append({
                         "amount": amount,
                         "date": date.strftime("%Y-%m-%d")
@@ -603,16 +780,19 @@ elif page == "💰 Savings & Investments":
                     })
                     st.session_state.new_investment_contribution = False
                     st.rerun()
+                elif cancelled:
+                    st.session_state.new_investment_contribution = False
+                    st.rerun()
         
         if data["investment_contributions"]:
             contrib_df = pd.DataFrame(data["investment_contributions"])
             contrib_df["amount"] = contrib_df["amount"].apply(lambda x: f"€{x:,.2f}")
             st.dataframe(contrib_df, use_container_width=True, hide_index=True)
             
-            total_contributions = sum(c.get("amount", 0) for c in data["investment_contributions"])
-            st.metric("Total Contributions", f"€{total_contributions:,.2f}")
+            total_one_time = sum(c.get("amount", 0) for c in data["investment_contributions"])
+            st.metric("Total One-Time Contributions", f"€{total_one_time:,.2f}")
         else:
-            st.info("No investment contributions recorded yet.")
+            st.info("No one-time contributions recorded yet.")
     
     with tab3:
         st.subheader("Net Worth Overview")
@@ -716,7 +896,9 @@ elif page == "⚙️ Settings":
                 "fixed_expenses": [],
                 "variable_expenses": [],
                 "savings_contributions": [],
+                "savings_recurring_monthly": [],
                 "investment_contributions": [],
+                "investment_recurring_monthly": [],
                 "transactions": []
             }
             st.session_state.data = data
