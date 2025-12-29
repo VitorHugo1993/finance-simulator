@@ -300,16 +300,22 @@ elif page == "💵 Income & Expenses":
     with tab3:
         st.subheader("Variable Expenses")
         
-        if st.button("➕ Add Variable Expense"):
-            if "new_variable_expense" not in st.session_state:
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("➕ Add Variable Expense"):
                 st.session_state.new_variable_expense = True
         
         if st.session_state.get("new_variable_expense", False):
-            with st.form("add_variable_expense"):
+            with st.form("add_variable_expense", clear_on_submit=True):
                 name = st.text_input("Expense Name")
                 amount = st.number_input("Amount", min_value=0.0, step=10.0)
                 date = st.date_input("Date", value=datetime.now())
-                submitted = st.form_submit_button("Add Expense")
+                col1, col2 = st.columns(2)
+                with col1:
+                    submitted = st.form_submit_button("✅ Add Expense", use_container_width=True)
+                with col2:
+                    cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
+                
                 if submitted and name:
                     data["variable_expenses"].append({
                         "name": name,
@@ -325,11 +331,82 @@ elif page == "💵 Income & Expenses":
                     })
                     st.session_state.new_variable_expense = False
                     st.rerun()
+                elif cancelled:
+                    st.session_state.new_variable_expense = False
+                    st.rerun()
         
         if data["variable_expenses"]:
-            expenses_df = pd.DataFrame(data["variable_expenses"])
-            expenses_df["amount"] = expenses_df["amount"].apply(lambda x: f"€{x:,.2f}")
-            st.dataframe(expenses_df, use_container_width=True, hide_index=True)
+            # Display expenses with edit/delete options
+            for idx, expense in enumerate(data["variable_expenses"]):
+                col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 1])
+                with col1:
+                    st.write(f"**{expense.get('name', 'Unnamed')}**")
+                with col2:
+                    st.write(f"€{expense.get('amount', 0):,.2f}")
+                with col3:
+                    st.write(f"📅 {expense.get('date', 'N/A')}")
+                with col4:
+                    if st.button("✏️", key=f"edit_variable_{idx}"):
+                        st.session_state[f"editing_variable_{idx}"] = True
+                with col5:
+                    if st.button("🗑️", key=f"delete_variable_{idx}"):
+                        # Remove from variable expenses
+                        deleted_expense = data["variable_expenses"].pop(idx)
+                        # Remove corresponding transaction
+                        for trans_idx, trans in enumerate(data["transactions"]):
+                            if (trans.get("type") == "expense" and 
+                                trans.get("category") == "variable" and
+                                trans.get("name") == deleted_expense.get("name") and
+                                trans.get("date") == deleted_expense.get("date")):
+                                data["transactions"].pop(trans_idx)
+                                break
+                        st.rerun()
+                
+                # Edit form
+                if st.session_state.get(f"editing_variable_{idx}", False):
+                    with st.form(f"edit_variable_expense_{idx}"):
+                        new_name = st.text_input("Expense Name", value=expense.get('name', ''), key=f"var_edit_name_{idx}")
+                        new_amount = st.number_input("Amount", min_value=0.0, value=float(expense.get('amount', 0)), step=10.0, key=f"var_edit_amount_{idx}")
+                        expense_date = datetime.strptime(expense.get('date', datetime.now().strftime("%Y-%m-%d")), "%Y-%m-%d").date()
+                        new_date = st.date_input("Date", value=expense_date, key=f"var_edit_date_{idx}")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Save", use_container_width=True):
+                                old_expense = data["variable_expenses"][idx].copy()
+                                data["variable_expenses"][idx]["name"] = new_name
+                                data["variable_expenses"][idx]["amount"] = new_amount
+                                data["variable_expenses"][idx]["date"] = new_date.strftime("%Y-%m-%d")
+                                
+                                # Update corresponding transaction
+                                for trans in data["transactions"]:
+                                    if (trans.get("type") == "expense" and 
+                                        trans.get("category") == "variable" and
+                                        trans.get("name") == old_expense.get("name") and
+                                        trans.get("date") == old_expense.get("date")):
+                                        trans["name"] = new_name
+                                        trans["amount"] = -new_amount
+                                        trans["date"] = new_date.strftime("%Y-%m-%d")
+                                        break
+                                
+                                st.session_state[f"editing_variable_{idx}"] = False
+                                st.rerun()
+                        with col2:
+                            if st.form_submit_button("❌ Cancel", use_container_width=True):
+                                st.session_state[f"editing_variable_{idx}"] = False
+                                st.rerun()
+            
+            st.divider()
+            
+            # Summary
+            total_variable = sum(exp.get("amount", 0) for exp in data["variable_expenses"])
+            st.metric("Total Variable Expenses", f"€{total_variable:,.2f}")
+            
+            # Delete all option
+            if st.button("🗑️ Delete All Variable Expenses"):
+                # Remove all corresponding transactions
+                data["transactions"] = [t for t in data["transactions"] if not (t.get("type") == "expense" and t.get("category") == "variable")]
+                data["variable_expenses"] = []
+                st.rerun()
         else:
             st.info("No variable expenses added yet.")
 
