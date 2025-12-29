@@ -187,7 +187,8 @@ elif page == "💵 Income & Expenses":
             options=[12, 14],
             index=0 if data["income"].get("salary_months", 14) == 12 else 1,
             horizontal=True,
-            help="Select 12 months (standard) or 14 months (Portugal - includes holiday and Christmas bonuses)"
+            help="Select 12 months (standard) or 14 months (Portugal - includes holiday and Christmas bonuses)",
+            key="radio_salary_months"
         )
         data["income"]["salary_months"] = salary_months
         
@@ -196,11 +197,11 @@ elif page == "💵 Income & Expenses":
         col1, col2 = st.columns(2)
         
         with col1:
-            user_salary = st.number_input("Your Net Monthly Salary", min_value=0.0, value=float(data["income"]["user_salary"]), step=100.0)
+            user_salary = st.number_input("Your Net Monthly Salary", min_value=0.0, value=float(data["income"]["user_salary"]), step=100.0, key="input_user_salary")
             data["income"]["user_salary"] = user_salary
         
         with col2:
-            partner_salary = st.number_input("Partner's Net Monthly Salary", min_value=0.0, value=float(data["income"]["partner_salary"]), step=100.0)
+            partner_salary = st.number_input("Partner's Net Monthly Salary", min_value=0.0, value=float(data["income"]["partner_salary"]), step=100.0, key="input_partner_salary")
             data["income"]["partner_salary"] = partner_salary
         
         total_income = user_salary + partner_salary
@@ -217,7 +218,7 @@ elif page == "💵 Income & Expenses":
         
         col1, col2 = st.columns([1, 4])
         with col1:
-            if st.button("➕ Add Fixed Expense"):
+            if st.button("➕ Add Fixed Expense", key="btn_add_fixed_expense"):
                 st.session_state.new_fixed_expense = True
         
         if st.session_state.get("new_fixed_expense", False):
@@ -278,7 +279,7 @@ elif page == "💵 Income & Expenses":
             st.metric("Total Fixed Expenses", f"€{total_fixed:,.2f}")
             
             # Delete all option
-            if st.button("🗑️ Delete All Fixed Expenses"):
+            if st.button("🗑️ Delete All Fixed Expenses", key="btn_delete_all_fixed"):
                 data["fixed_expenses"] = []
                 st.rerun()
         else:
@@ -289,7 +290,7 @@ elif page == "💵 Income & Expenses":
         
         col1, col2 = st.columns([1, 4])
         with col1:
-            if st.button("➕ Add Variable Expense"):
+            if st.button("➕ Add Variable Expense", key="btn_add_variable_expense"):
                 st.session_state.new_variable_expense = True
         
         if st.session_state.get("new_variable_expense", False):
@@ -389,7 +390,7 @@ elif page == "💵 Income & Expenses":
             st.metric("Total Variable Expenses", f"€{total_variable:,.2f}")
             
             # Delete all option
-            if st.button("🗑️ Delete All Variable Expenses"):
+            if st.button("🗑️ Delete All Variable Expenses", key="btn_delete_all_variable"):
                 # Remove all corresponding transactions
                 data["transactions"] = [t for t in data["transactions"] if not (t.get("type") == "expense" and t.get("category") == "variable")]
                 data["variable_expenses"] = []
@@ -426,7 +427,7 @@ elif page == "💰 Savings & Investments":
         st.divider()
         
         # Add new account button
-        if st.button("➕ Add New Savings Account"):
+        if st.button("➕ Add New Savings Account", key="btn_add_savings_account"):
             if "new_savings_account" not in st.session_state:
                 st.session_state.new_savings_account = True
         
@@ -451,7 +452,7 @@ elif page == "💰 Savings & Investments":
             st.subheader("Your Savings Accounts")
             
             for idx, account in enumerate(savings_accounts):
-                with st.expander(f"🏦 {account.get('name', 'Unnamed Account')} - €{account.get('balance', 0):,.2f}", expanded=False):
+                with st.expander(f"🏦 {account.get('name', 'Unnamed Account')} - €{account.get('balance', 0):,.2f}", expanded=False, key=f"expander_savings_{idx}"):
                     col1, col2 = st.columns([3, 1])
                     
                     with col1:
@@ -502,7 +503,7 @@ elif page == "💰 Savings & Investments":
         
         col1, col2 = st.columns([1, 4])
         with col1:
-            if st.button("➕ Add Recurring Contribution"):
+            if st.button("➕ Add Recurring Contribution", key="btn_add_savings_recurring"):
                 st.session_state.new_savings_recurring = True
         
         if st.session_state.get("new_savings_recurring", False):
@@ -585,7 +586,7 @@ elif page == "💰 Savings & Investments":
         st.subheader("One-Time Contributions")
         st.caption("💡 Record individual one-time contributions")
         
-        if st.button("➕ Add One-Time Contribution"):
+        if st.button("➕ Add One-Time Contribution", key="btn_add_savings_onetime"):
             if "new_savings_contribution" not in st.session_state:
                 st.session_state.new_savings_contribution = True
         
@@ -653,7 +654,8 @@ elif page == "💰 Savings & Investments":
             "Current Investment Balance",
             min_value=0.0,
             value=float(data["net_worth"]["investment_account"]),
-            step=100.0
+            step=100.0,
+            key="input_investment_balance"
         )
         data["net_worth"]["investment_account"] = current_investments
         
@@ -667,7 +669,7 @@ elif page == "💰 Savings & Investments":
         
         col1, col2 = st.columns([1, 4])
         with col1:
-            if st.button("➕ Add Recurring Contribution"):
+            if st.button("➕ Add Recurring Contribution", key="btn_add_investment_recurring"):
                 st.session_state.new_investment_recurring = True
         
         if st.session_state.get("new_investment_recurring", False):
@@ -733,7 +735,7 @@ elif page == "💰 Savings & Investments":
         st.subheader("One-Time Contributions")
         st.caption("💡 Record individual one-time contributions")
         
-        if st.button("➕ Add One-Time Contribution"):
+        if st.button("➕ Add One-Time Contribution", key="btn_add_investment_onetime"):
             if "new_investment_contribution" not in st.session_state:
                 st.session_state.new_investment_contribution = True
         
@@ -781,7 +783,8 @@ elif page == "💰 Savings & Investments":
             "Other Assets",
             min_value=0.0,
             value=float(data["net_worth"]["other_assets"]),
-            step=100.0
+            step=100.0,
+            key="input_other_assets"
         )
         data["net_worth"]["other_assets"] = other_assets
         
@@ -814,9 +817,9 @@ elif page == "🔮 Simulator":
     st.markdown("Simulate your net worth at the end of the year based on your current financial situation.")
     st.info("ℹ️ **Note:** Monthly contributions (savings & investments) are calculated as consistent 12-month contributions, regardless of whether you receive 12 or 14 months salary.")
     
-    years = st.slider("Number of Years to Simulate", min_value=1, max_value=10, value=1)
+    years = st.slider("Number of Years to Simulate", min_value=1, max_value=10, value=1, key="slider_simulation_years")
     
-    if st.button("🚀 Run Simulation"):
+    if st.button("🚀 Run Simulation", key="btn_run_simulation"):
         simulation = simulate_year_end_networth(data, years)
         
         col1, col2 = st.columns(2)
@@ -855,12 +858,12 @@ elif page == "⚙️ Settings":
     
     st.subheader("Data Management")
     
-    if st.button("💾 Save All Data"):
+    if st.button("💾 Save All Data", key="btn_save_all_data"):
         save_data(data)
         st.success("Data saved successfully!")
     
-    if st.button("🔄 Reset All Data"):
-        if st.checkbox("I understand this will delete all my data"):
+    if st.button("🔄 Reset All Data", key="btn_reset_all_data"):
+        if st.checkbox("I understand this will delete all my data", key="checkbox_confirm_reset"):
             data = {
                 "net_worth": {
                     "current": 0,
