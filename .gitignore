@@ -1,0 +1,29 @@
+# Database
+*.db
+*.sqlite
+*.sqlite3
+budget_data.db
+
+# JSON backup (if migrating)
+budget_data.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+

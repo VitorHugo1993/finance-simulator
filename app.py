@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
+from database import load_data, save_data, init_database, migrate_from_json
 
 # Page configuration
 st.set_page_config(
@@ -13,39 +14,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Data file path
-DATA_FILE = "budget_data.json"
-
-def load_data():
-    """Load financial data from JSON file"""
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, 'r') as f:
-            return json.load(f)
-    return {
-        "net_worth": {
-            "current": 0,
-            "savings_accounts": [],
-            "investment_account": 0,
-            "other_assets": 0
-        },
-        "income": {
-            "user_salary": 0,
-            "partner_salary": 0,
-            "salary_months": 14
-        },
-        "fixed_expenses": [],
-        "variable_expenses": [],
-        "savings_contributions": [],
-        "savings_recurring_monthly": [],
-        "investment_contributions": [],
-        "investment_recurring_monthly": [],
-        "transactions": []
-    }
-
-def save_data(data):
-    """Save financial data to JSON file"""
-    with open(DATA_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+# Initialize database on startup
+if 'db_initialized' not in st.session_state:
+    init_database()
+    migrated = migrate_from_json()
+    st.session_state.db_initialized = True
+    if migrated:
+        st.session_state.show_migration_success = True
 
 def calculate_total_expenses(data):
     """Calculate total monthly expenses"""
@@ -129,6 +104,11 @@ if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
 data = st.session_state.data
+
+# Show migration success message if data was migrated
+if st.session_state.get("show_migration_success", False):
+    st.success("✅ Successfully migrated your data from JSON to database! Your data is now safely stored.")
+    st.session_state.show_migration_success = False
 
 # Sidebar navigation
 st.sidebar.title("💰 Budget Tracker")
