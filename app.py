@@ -211,7 +211,7 @@ if page == "📊 Dashboard":
 elif page == "💵 Income & Expenses":
     st.title("💵 Income & Expenses")
     
-    tab1, tab2, tab3, tab4 = st.tabs(["💰 Income", "📋 Fixed Expenses", "📅 Yearly Expenses", "🛒 Variable Expenses"])
+    tab1, tab2, tab3 = st.tabs(["💰 Income", "📋 Fixed Expenses", "🛒 Variable Expenses"])
     
     with tab1:
         st.subheader("Net Monthly Income")
@@ -249,7 +249,8 @@ elif page == "💵 Income & Expenses":
             st.metric(f"Net Yearly Income ({salary_months} months)", f"€{yearly_income:,.2f}")
     
     with tab2:
-        st.subheader("Fixed Monthly Expenses")
+        st.subheader("Fixed Expenses")
+        st.caption("💡 Add monthly or yearly fixed expenses. Yearly expenses are automatically converted to monthly equivalents in calculations.")
         
         col1, col2 = st.columns([1, 4])
         with col1:
@@ -258,8 +259,9 @@ elif page == "💵 Income & Expenses":
         
         if st.session_state.get("new_fixed_expense", False):
             with st.form("add_fixed_expense", clear_on_submit=True):
-                name = st.text_input("Expense Name", key="new_fixed_expense_name")
+                name = st.text_input("Expense Name", key="new_fixed_expense_name", placeholder="e.g., Rent, Car Insurance")
                 amount = st.number_input("Amount", min_value=0.0, step=10.0, key="new_fixed_expense_amount")
+                frequency = st.radio("Frequency", ["Monthly", "Yearly"], horizontal=True, key="new_fixed_expense_frequency")
                 col1, col2 = st.columns(2)
                 with col1:
                     submitted = st.form_submit_button("✅ Add Expense", use_container_width=True)
@@ -267,21 +269,28 @@ elif page == "💵 Income & Expenses":
                     cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
                 
                 if submitted and name:
-                    data["fixed_expenses"].append({"name": name, "amount": amount})
+                    if frequency == "Monthly":
+                        data["fixed_expenses"].append({"name": name, "amount": amount})
+                    else:  # Yearly
+                        # Initialize yearly_fixed_expenses if it doesn't exist
+                        if "yearly_fixed_expenses" not in data:
+                            data["yearly_fixed_expenses"] = []
+                        data["yearly_fixed_expenses"].append({"name": name, "amount": amount})
                     st.session_state.new_fixed_expense = False
                     st.rerun()
                 elif cancelled:
                     st.session_state.new_fixed_expense = False
                     st.rerun()
         
-        if data["fixed_expenses"]:
-            # Display expenses with edit/delete options
+        # Display monthly fixed expenses
+        if data.get("fixed_expenses"):
+            st.markdown("### Monthly Fixed Expenses")
             for idx, expense in enumerate(data["fixed_expenses"]):
                 col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
                 with col1:
                     st.write(f"**{expense.get('name', 'Unnamed')}**")
                 with col2:
-                    st.write(f"€{expense.get('amount', 0):,.2f}")
+                    st.write(f"€{expense.get('amount', 0):,.2f} per month")
                 with col3:
                     if st.button("✏️", key=f"edit_fixed_{idx}"):
                         st.session_state[f"editing_fixed_{idx}"] = True
@@ -294,7 +303,7 @@ elif page == "💵 Income & Expenses":
                 if st.session_state.get(f"editing_fixed_{idx}", False):
                     with st.form(f"edit_fixed_expense_{idx}"):
                         new_name = st.text_input("Expense Name", value=expense.get('name', ''), key=f"edit_name_{idx}")
-                        new_amount = st.number_input("Amount", min_value=0.0, value=float(expense.get('amount', 0)), step=10.0, key=f"edit_amount_{idx}")
+                        new_amount = st.number_input("Monthly Amount", min_value=0.0, value=float(expense.get('amount', 0)), step=10.0, key=f"edit_amount_{idx}")
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.form_submit_button("💾 Save", use_container_width=True):
@@ -306,17 +315,63 @@ elif page == "💵 Income & Expenses":
                             if st.form_submit_button("❌ Cancel", use_container_width=True):
                                 st.session_state[f"editing_fixed_{idx}"] = False
                                 st.rerun()
-            
+        
+        # Display yearly fixed expenses
+        if "yearly_fixed_expenses" not in data:
+            data["yearly_fixed_expenses"] = []
+        
+        if data["yearly_fixed_expenses"]:
             st.divider()
+            st.markdown("### Yearly Fixed Expenses")
+            for idx, expense in enumerate(data["yearly_fixed_expenses"]):
+                col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 1])
+                with col1:
+                    st.write(f"**{expense.get('name', 'Unnamed')}**")
+                with col2:
+                    st.write(f"€{expense.get('amount', 0):,.2f} per year")
+                with col3:
+                    monthly_equiv = expense.get('amount', 0) / 12.0
+                    st.write(f"€{monthly_equiv:,.2f} per month")
+                with col4:
+                    if st.button("✏️", key=f"edit_yearly_{idx}"):
+                        st.session_state[f"editing_yearly_{idx}"] = True
+                with col5:
+                    if st.button("🗑️", key=f"delete_yearly_{idx}"):
+                        data["yearly_fixed_expenses"].pop(idx)
+                        st.rerun()
+                
+                # Edit form
+                if st.session_state.get(f"editing_yearly_{idx}", False):
+                    with st.form(f"edit_yearly_expense_{idx}"):
+                        new_name = st.text_input("Expense Name", value=expense.get('name', ''), key=f"yearly_edit_name_{idx}")
+                        new_amount = st.number_input("Yearly Amount", min_value=0.0, value=float(expense.get('amount', 0)), step=50.0, key=f"yearly_edit_amount_{idx}")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Save", use_container_width=True):
+                                data["yearly_fixed_expenses"][idx]["name"] = new_name
+                                data["yearly_fixed_expenses"][idx]["amount"] = new_amount
+                                st.session_state[f"editing_yearly_{idx}"] = False
+                                st.rerun()
+                        with col2:
+                            if st.form_submit_button("❌ Cancel", use_container_width=True):
+                                st.session_state[f"editing_yearly_{idx}"] = False
+                                st.rerun()
+        
+        # Summary
+        if data.get("fixed_expenses") or data.get("yearly_fixed_expenses"):
+            st.divider()
+            total_monthly = sum(exp.get("amount", 0) for exp in data.get("fixed_expenses", []))
+            total_yearly = sum(exp.get("amount", 0) for exp in data.get("yearly_fixed_expenses", []))
+            total_yearly_monthly_equiv = total_yearly / 12.0
+            total_all = total_monthly + total_yearly_monthly_equiv
             
-            # Summary
-            total_fixed = sum(exp.get("amount", 0) for exp in data["fixed_expenses"])
-            st.metric("Total Fixed Expenses", f"€{total_fixed:,.2f}")
-            
-            # Delete all option
-            if st.button("🗑️ Delete All Fixed Expenses", key="btn_delete_all_fixed"):
-                data["fixed_expenses"] = []
-                st.rerun()
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Monthly Expenses", f"€{total_monthly:,.2f}")
+            with col2:
+                st.metric("Total Yearly Expenses (Monthly)", f"€{total_yearly_monthly_equiv:,.2f}")
+            with col3:
+                st.metric("Total Fixed Expenses", f"€{total_all:,.2f}")
         else:
             st.info("No fixed expenses added yet.")
     
@@ -398,14 +453,7 @@ elif page == "💵 Income & Expenses":
             with col2:
                 st.metric("Monthly Equivalent", f"€{total_monthly_equiv:,.2f}")
             
-            # Delete all option
-            if st.button("🗑️ Delete All Yearly Expenses", key="btn_delete_all_yearly"):
-                data["yearly_fixed_expenses"] = []
-                st.rerun()
-        else:
-            st.info("No yearly expenses added yet.")
-    
-    with tab4:
+    with tab3:
         st.subheader("Variable Expenses")
         
         col1, col2 = st.columns([1, 4])
